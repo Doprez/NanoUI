@@ -25,7 +25,8 @@ namespace NanoUIDemos
             for (uint i = 0; i < 12; i++)
             {
                 string file = "./Assets/images/image" + i + ".png";
-                _textures[i] = ctx.CreateTexture(file);
+
+                _textures[i] = ctx.CreateTexture(Path.GetFullPath(file));
 
                 if (_textures[i] < 0)
                 {
