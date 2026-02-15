@@ -3,6 +3,7 @@ using NanoUI.Nvg;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using static StbTrueTypeSharp.StbTrueType;
 
 namespace NanoUI.Fonts
@@ -26,34 +27,41 @@ namespace NanoUI.Fonts
 
         public bool Load(int fontId, ReadOnlySpan<byte> data, int fontCollectionIndex)
         {
-            fixed (byte* ptr = data)
-            {
-                int stbError;
-                int offset = stbtt_GetFontOffsetForIndex(ptr, fontCollectionIndex);
+            // Copy font data to unmanaged memory so stbtt_fontinfo.data pointer stays valid
+            // after this method returns (the managed byte[] may be GC'd otherwise).
+            // Must use AllocHGlobal since stbtt_fontinfo.Dispose uses Marshal.FreeHGlobal.
+            var dataCopy = (byte*)Marshal.AllocHGlobal(data.Length);
+            data.CopyTo(new Span<byte>(dataCopy, data.Length));
 
-                if (offset == -1)
+            int stbError;
+            int offset = stbtt_GetFontOffsetForIndex(dataCopy, fontCollectionIndex);
+
+            if (offset == -1)
+            {
+                Marshal.FreeHGlobal((nint)dataCopy);
+                stbError = 0;
+            }
+            else
+            {
+                stbtt_fontinfo font = new()
                 {
-                    stbError = 0;
+                    isDataCopy = true // ensure Dispose frees the unmanaged copy
+                };
+                stbError = stbtt_InitFont(font, dataCopy, offset);
+
+                if (stbError != 0)
+                {
+                    // add to dictionary
+                    _fonts[fontId] = font;
                 }
                 else
                 {
-                    stbtt_fontinfo font = new();
-                    stbError = stbtt_InitFont(font, ptr, offset);
-
-                    if (stbError != 0)
-                    {
-                        // add to dictionary
-                        _fonts[fontId] = font;
-                    }
-                    else
-                    {
-                        // todo: throw error?
-                        font.Dispose();
-                    }
+                    // todo: throw error?
+                    font.Dispose();
                 }
-
-                return stbError != 0;
             }
+
+            return stbError != 0;
         }
 
         public void GetFontVMetrics(int fontId, out int ascent, out int descent, out int lineGap)
