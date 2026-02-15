@@ -1,8 +1,9 @@
-﻿using NanoUI.Common;
+﻿using System;
+using System.IO;
+using NanoUI.Common;
 using NanoUI.Components.Views;
 using NanoUI.Components.Simple;
 using NanoUI.Components.Views.Items;
-using System.IO;
 
 namespace NanoUI.Components.Files
 {
@@ -100,31 +101,46 @@ namespace NanoUI.Components.Files
             }
 
             // Loop child folders
-            foreach (var folder in di.EnumerateDirectories())
+            try
             {
-                // hide hidden folders
-                if ((folder.Attributes & FileAttributes.Hidden) != 0)
-                    continue;
+                foreach (var folder in di.EnumerateDirectories())
+                {
+                    // hide hidden folders
+                    if ((folder.Attributes & FileAttributes.Hidden) != 0)
+                        continue;
 
-                Add(CreateFileItem(
-                    Path.GetFileName(folder.Name),
-                    new FileFolderInfo(folder.FullName, FileFolderType.Folder)));
+                    Add(CreateFileItem(
+                        Path.GetFileName(folder.Name),
+                        new FileFolderInfo(folder.FullName, FileFolderType.Folder)));
 
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Folder is locked/protected, skip enumeration
+                return;
             }
 
             // Show files?
             if (ShowFiles)
             {
-                // Loop child files
-                foreach (var file in di.EnumerateFiles())
+                try
                 {
-                    // hide hidden files
-                    if ((file.Attributes & FileAttributes.Hidden) != 0)
-                        continue;
+                    // Loop child files
+                    foreach (var file in di.EnumerateFiles())
+                    {
+                        // hide hidden files
+                        if ((file.Attributes & FileAttributes.Hidden) != 0)
+                            continue;
 
-                    Add(CreateFileItem(
-                        Path.GetFileName(file.Name),
-                        new FileFolderInfo(file.FullName, FileFolderType.File)));
+                        Add(CreateFileItem(
+                            Path.GetFileName(file.Name),
+                            new FileFolderInfo(file.FullName, FileFolderType.File)));
+                    }
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // Folder is locked/protected, skip file enumeration
                 }
             }
         }
